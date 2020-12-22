@@ -104,7 +104,9 @@ const RTCEvents = {
      * is the source of the event.
      * The second argument is the actual "ufrag" string.
      */
-    REMOTE_UFRAG_CHANGED: 'rtc.remote_ufrag_changed'
+    REMOTE_UFRAG_CHANGED: 'rtc.remote_ufrag_changed',
+
+    DATA_CHANNEL_CLOSED: 'rtc.datachannel_closed'
 };
 
 module.exports = RTCEvents;

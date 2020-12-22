@@ -124,7 +124,6 @@ function setResolutionConstraints(
         constraints,
         isNewStyleConstraintsSupported,
         resolution) {
-    console.log("**** BARIS: constraints");
     if (Resolutions[resolution]) {
         if (isNewStyleConstraintsSupported) {
             constraints.video.width = {

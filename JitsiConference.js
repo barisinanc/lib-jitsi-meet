@@ -2527,7 +2527,11 @@ JitsiConference.prototype.sendMessage = function(
     }
 
     if (sendThroughVideobridge) {
-        this.sendEndpointMessage(to, message);
+        try {
+            this.sendEndpointMessage(to, message);
+        } catch (e) {
+            console.log('error, endpoint message cannot be send', e);
+        }
     } else {
         let messageToSend = message;
 
