@@ -634,6 +634,10 @@ JitsiConferenceEventManager.prototype.setupRTCListeners = function() {
                 conference.statistics.sendScreenSharingEvent(true, ssrc);
             }
         });
+    rtc.addListener(RTCEvents.DATA_CHANNEL_CLOSED, () => {
+
+        conference.eventEmitter.emit(JitsiConferenceEvents.DATA_CHANNEL_CLOSED);
+    });
 };
 
 /**

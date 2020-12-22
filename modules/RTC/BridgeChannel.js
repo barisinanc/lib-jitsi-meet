@@ -404,6 +404,7 @@ export default class BridgeChannel {
 
         if (!this.isOpen()) {
             logger.error('Bridge Channel send: no opened channel.');
+            this._eventEmitter.emit(RTCEvents.DATA_CHANNEL_CLOSED);
             throw new Error('No opened channel');
         }
 
