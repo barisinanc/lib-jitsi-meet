@@ -930,6 +930,7 @@ export default class RTC extends Listenable {
         if (this._channel) {
             this._channel.sendMessage(to, payload);
         } else {
+            this.eventEmitter.emit(RTCEvents.DATA_CHANNEL_CLOSED);
             throw new Error('Channel support is disabled!');
         }
     }
