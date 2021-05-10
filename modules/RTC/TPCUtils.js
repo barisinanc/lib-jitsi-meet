@@ -3,7 +3,6 @@ import transform from 'sdp-transform';
 
 import * as MediaType from '../../service/RTC/MediaType';
 import RTCEvents from '../../service/RTC/RTCEvents';
-import VideoType from '../../service/RTC/VideoType';
 import browser from '../browser';
 
 const logger = getLogger(__filename);
@@ -27,7 +26,7 @@ export class TPCUtils {
      */
     constructor(peerconnection, videoBitrates) {
         this.pc = peerconnection;
-        this.videoBitrates = videoBitrates;
+        this.videoBitrates = videoBitrates.VP8 || videoBitrates;
 
         /**
          * The startup configuration for the stream encodings that are applicable to
@@ -192,8 +191,7 @@ export class TPCUtils {
     /**
     * Adds {@link JitsiLocalTrack} to the WebRTC peerconnection for the first time.
     * @param {JitsiLocalTrack} track - track to be added to the peerconnection.
-    * @param {boolean} isInitiator - boolean that indicates if the endpoint is offerer
-    * in a p2p connection.
+    * @param {boolean} isInitiator - boolean that indicates if the endpoint is offerer in a p2p connection.
     * @returns {void}
     */
     addTrack(localTrack, isInitiator) {
@@ -239,13 +237,18 @@ export class TPCUtils {
         }
         logger.debug(`Adding ${localTrack} on ${this.pc}`);
 
-        // If the client starts with audio/video muted setting, the transceiver direction
-        // will be set to 'recvonly'. Use addStream here so that a MSID is generated for the stream.
+        // If the client starts with audio/video muted setting, the transceiver direction will be set to 'recvonly'.
         if (transceiver.direction === 'recvonly') {
             const stream = localTrack.getOriginalStream();
 
-            if (stream) {
-                this.pc.peerconnection.addStream(localTrack.getOriginalStream());
+            if (stream && track) {
+                try {
+                    this.pc.peerconnection.addTrack(track, stream);
+                } catch (error) {
+                    logger.error(`Adding ${localTrack} failed on ${this.pc}:${error?.message}`);
+
+                    return Promise.reject(error);
+                }
 
                 return this.setEncodings(localTrack).then(() => {
                     this.pc.localTracks.set(localTrack.rtcId, localTrack);
@@ -366,6 +369,10 @@ export class TPCUtils {
                     this.pc.localSSRCs.set(newTrack.rtcId, ssrc);
                 });
         }
+
+        logger.info('TPCUtils.replaceTrack called with no new track and no old track');
+
+        return Promise.resolve();
     }
 
     /**
@@ -392,6 +399,12 @@ export class TPCUtils {
             .find(t => t.sender && t.sender.track && t.sender.track.kind === track.getType());
         const parameters = transceiver.sender.getParameters();
 
+        // Resolve if the encodings are not available yet. This happens immediately after the track is added to the
+        // peerconnection on chrome in unified-plan. It is ok to ignore and not report the error here since the
+        // action that triggers 'addTrack' (like unmute) will also configure the encodings and set bitrates after that.
+        if (!parameters?.encodings?.length) {
+            return Promise.resolve();
+        }
         parameters.encodings = this._getStreamEncodings(track);
 
         return transceiver.sender.setParameters(parameters);
@@ -447,20 +460,18 @@ export class TPCUtils {
      * @returns {void}
      */
     updateEncodingsResolution(parameters) {
-        const localVideoTrack = this.pc.getLocalVideoTrack();
-
-        // Ignore desktop and non-simulcast tracks.
-        if (!(parameters
-            && parameters.encodings
-            && Array.isArray(parameters.encodings)
-            && this.pc.isSimulcastOn()
-            && localVideoTrack
-            && localVideoTrack.videoType !== VideoType.DESKTOP)) {
+        if (!(browser.isWebKitBased() && parameters.encodings && Array.isArray(parameters.encodings))) {
             return;
         }
+        const allEqualEncodings
+            = encodings => encodings.every(encoding => typeof encoding.scaleResolutionDownBy !== 'undefined'
+                && encoding.scaleResolutionDownBy === encodings[0].scaleResolutionDownBy);
 
-        parameters.encodings.forEach((encoding, idx) => {
-            encoding.scaleResolutionDownBy = this.localStreamEncodingsConfig[idx].scaleResolutionDownBy;
-        });
+        // Implement the workaround only when all the encodings report the same resolution.
+        if (allEqualEncodings(parameters.encodings)) {
+            parameters.encodings.forEach((encoding, idx) => {
+                encoding.scaleResolutionDownBy = this.localStreamEncodingsConfig[idx].scaleResolutionDownBy;
+            });
+        }
     }
 }
