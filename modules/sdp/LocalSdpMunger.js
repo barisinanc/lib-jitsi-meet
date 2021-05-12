@@ -22,9 +22,11 @@ export default class LocalSdpMunger {
      * Creates new <tt>LocalSdpMunger</tt> instance.
      *
      * @param {TraceablePeerConnection} tpc
+     * @param {string} localEndpointId - The endpoint id of the local user.
      */
-    constructor(tpc) {
+    constructor(tpc, localEndpointId) {
         this.tpc = tpc;
+        this.localEndpointId = localEndpointId;
     }
 
     /**
@@ -77,12 +79,6 @@ export default class LocalSdpMunger {
                 = mediaStream && this.tpc.isMediaStreamInPc(mediaStream);
             const shouldFakeSdp = muted || !isInPeerConnection;
 
-            logger.debug(
-                `${this.tpc} ${videoTrack} muted: ${
-                    muted}, is in PeerConnection: ${
-                    isInPeerConnection} => should fake sdp ? : ${
-                    shouldFakeSdp}`);
-
             if (!shouldFakeSdp) {
                 continue; // eslint-disable-line no-continue
             }
@@ -94,8 +90,7 @@ export default class LocalSdpMunger {
                     : [ this.tpc.sdpConsistency.cachedPrimarySsrc ];
 
             if (!requiredSSRCs.length) {
-                logger.error(
-                    `No SSRCs stored for: ${videoTrack} in ${this.tpc}`);
+                logger.error(`No SSRCs stored for: ${videoTrack} in ${this.tpc}`);
 
                 continue; // eslint-disable-line no-continue
             }
@@ -122,9 +117,6 @@ export default class LocalSdpMunger {
                 videoMLine.removeSSRC(ssrcNum);
 
                 // Inject
-                logger.debug(
-                    `${this.tpc} injecting video SSRC: ${ssrcNum} for ${
-                        videoTrack}`);
                 videoMLine.addSSRCAttribute({
                     id: ssrcNum,
                     attribute: 'cname',
@@ -144,9 +136,6 @@ export default class LocalSdpMunger {
 
                 if (!videoMLine.findGroup(group.semantics, group.ssrcs)) {
                     // Inject the group
-                    logger.debug(
-                        `${this.tpc} injecting SIM group for ${videoTrack}`,
-                        group);
                     videoMLine.addSSRCGroup(group);
                 }
             }
@@ -188,11 +177,17 @@ export default class LocalSdpMunger {
                     const streamAndTrackIDs = ssrcLine.value.split(' ');
 
                     if (streamAndTrackIDs.length === 2) {
-                        const streamId = streamAndTrackIDs[0];
+                        let streamId = streamAndTrackIDs[0];
                         const trackId = streamAndTrackIDs[1];
 
-                        ssrcLine.value
-                            = `${streamId}-${pcId} ${trackId}-${pcId}`;
+                        // Handle a case on Firefox when the browser doesn't produce a 'a:ssrc' line with the 'msid'
+                        // attribute. Jicofo needs an unique identifier to be associated with a ssrc and uses the msid
+                        // for that. Generate the identifier using the local endpoint id.
+                        // eslint-disable-next-line max-depth
+                        if (streamId === '-') {
+                            streamId = `${this.localEndpointId}-${mediaSection.type}`;
+                        }
+                        ssrcLine.value = `${streamId}-${pcId} ${trackId}-${pcId}`;
                     } else {
                         logger.warn(
                             'Unable to munge local MSID'

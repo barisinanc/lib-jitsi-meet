@@ -273,7 +273,7 @@ export default function TraceablePeerConnection(
      * sending SSRC updates on attach/detach and mute/unmute (for video).
      * @type {LocalSdpMunger}
      */
-    this.localSdpMunger = new LocalSdpMunger(this);
+    this.localSdpMunger = new LocalSdpMunger(this, this.rtc.getLocalEndpointId());
 
     /**
      * TracablePeerConnection uses RTC's eventEmitter
@@ -901,7 +901,7 @@ TraceablePeerConnection.prototype._remoteTrackAdded = function(stream, track, tr
         return;
     }
 
-    logger.log(`${this} associated ssrc`, ownerEndpointId, trackSsrc);
+    logger.log(`${this} associated ssrc:${trackSsrc} to endpoint:${ownerEndpointId}`);
 
     const peerMediaInfo
         = this.signalingLayer.getPeerMediaInfo(ownerEndpointId, mediaType);
@@ -1836,7 +1836,7 @@ TraceablePeerConnection.prototype._assertTrackBelongs = function(
  * video in the local SDP.
  */
 TraceablePeerConnection.prototype.getConfiguredVideoCodec = function() {
-    const sdp = this.localDescription.sdp;
+    const sdp = this.peerconnection.localDescription.sdp;
     const defaultCodec = CodecMimeType.VP8;
 
     if (!sdp) {
@@ -2901,23 +2901,9 @@ TraceablePeerConnection.prototype._processLocalSSRCsMap = function(ssrcMap) {
 
             // eslint-disable-next-line no-negated-condition
             if (newSSRCNum !== oldSSRCNum) {
-                if (oldSSRCNum === null) {
-                    logger.info(
-                        `Storing new local SSRC for ${track} in ${this}`,
-                        newSSRC);
-                } else {
-                    logger.error(
-                        `Overwriting SSRC for ${track} ${trackMSID} in ${this
-                        } with: `, newSSRC);
-                }
+                oldSSRCNum && logger.error(`Overwriting SSRC for ${track} ${trackMSID} in ${this} with: `, newSSRC);
                 this.localSSRCs.set(track.rtcId, newSSRC);
-
-                this.eventEmitter.emit(
-                    RTCEvents.LOCAL_TRACK_SSRC_UPDATED, track, newSSRCNum);
-            } else {
-                logger.debug(
-                    `The local SSRC(${newSSRCNum}) for ${track} ${trackMSID}`
-                     + `is still up to date in ${this}`);
+                this.eventEmitter.emit(RTCEvents.LOCAL_TRACK_SSRC_UPDATED, track, newSSRCNum);
             }
         } else if (!track.isVideoTrack() && !track.isMuted()) {
             // It is normal to find no SSRCs for a muted video track in
@@ -3033,5 +3019,5 @@ TraceablePeerConnection.prototype.generateNewStreamSSRCInfo = function(track) {
  * @return {string}
  */
 TraceablePeerConnection.prototype.toString = function() {
-    return `TPC[${this.id},p2p:${this.isP2P}]`;
+    return `TPC[${this.id},${this.isP2P ? 'P2P' : 'JVB'}]`;
 };
