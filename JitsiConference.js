@@ -1362,6 +1362,7 @@ JitsiConference.prototype.selectParticipant = function(participantId) {
  * @returns {void}
  */
 JitsiConference.prototype.selectParticipants = function(participantIds) {
+    console.log("BARIS --- Selected participants list : [" + participantIds + "]");
     if (!Array.isArray(participantIds)) {
         throw new Error('Invalid argument; participantIds must be an array.');
     }
@@ -1385,7 +1386,8 @@ JitsiConference.prototype.getLastN = function() {
  * @throws Error or RangeError if the given value is not a number or is smaller
  * than -1.
  */
-JitsiConference.prototype.setLastN = function(lastN) {
+JitsiConference.prototype.setLastN = function(lastN) {  
+    console.log("BARIS --- Set lastN : [" + lastN + "]");
     if (!Number.isInteger(lastN) && !Number.parseInt(lastN, 10)) {
         throw new Error(`Invalid value for lastN: ${lastN}`);
     }
